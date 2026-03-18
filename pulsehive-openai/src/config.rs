@@ -88,8 +88,8 @@ mod tests {
 
     #[test]
     fn test_config_with_base_url() {
-        let config = OpenAIConfig::new("key", "glm-5")
-            .with_base_url("https://open.bigmodel.cn/api/paas/v4");
+        let config =
+            OpenAIConfig::new("key", "glm-5").with_base_url("https://open.bigmodel.cn/api/paas/v4");
         assert_eq!(config.base_url, "https://open.bigmodel.cn/api/paas/v4");
     }
 

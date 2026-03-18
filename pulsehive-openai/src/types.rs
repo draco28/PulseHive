@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use pulsehive_core::llm::{LlmChunk, LlmResponse, ToolCall, TokenUsage};
+use pulsehive_core::llm::{LlmChunk, LlmResponse, TokenUsage, ToolCall};
 
 /// Request body for POST /chat/completions
 #[derive(Debug, Serialize)]
@@ -321,7 +321,9 @@ mod tests {
         };
         let chunks = delta.into_chunks();
         assert_eq!(chunks.len(), 1);
-        assert!(matches!(&chunks[0], LlmChunk::ToolCallStart { id, name } if id == "call_1" && name == "search"));
+        assert!(
+            matches!(&chunks[0], LlmChunk::ToolCallStart { id, name } if id == "call_1" && name == "search")
+        );
     }
 
     #[test]

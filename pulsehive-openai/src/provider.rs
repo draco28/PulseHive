@@ -10,9 +10,7 @@ use futures_core::Stream;
 use serde_json::Value;
 
 use pulsehive_core::error::{PulseHiveError, Result};
-use pulsehive_core::llm::{
-    LlmChunk, LlmConfig, LlmProvider, LlmResponse, Message, ToolDefinition,
-};
+use pulsehive_core::llm::{LlmChunk, LlmConfig, LlmProvider, LlmResponse, Message, ToolDefinition};
 
 use crate::config::OpenAIConfig;
 use crate::types::{ChatCompletionRequest, ChatCompletionResponse, OpenAITool, StreamChunk};
@@ -88,10 +86,7 @@ impl OpenAICompatibleProvider {
     /// Retries on: 429 (rate limit), 500, 502, 503, 529 (server overloaded).
     /// Fails immediately on: 400, 401, 403, 404 (client errors).
     /// Uses exponential backoff: 1s → 2s → 4s, respects Retry-After header on 429.
-    async fn send_request(
-        &self,
-        request: &ChatCompletionRequest,
-    ) -> Result<reqwest::Response> {
+    async fn send_request(&self, request: &ChatCompletionRequest) -> Result<reqwest::Response> {
         let url = self.config.chat_completions_url();
         let max_attempts = self.config.max_retries + 1;
         let mut last_err = PulseHiveError::llm("No attempts made");
@@ -119,12 +114,10 @@ impl OpenAICompatibleProvider {
                         .await
                         .unwrap_or_else(|_| "<failed to read body>".into());
 
-                    let err_msg =
-                        format!("OpenAI API error (HTTP {status}): {body}");
+                    let err_msg = format!("OpenAI API error (HTTP {status}): {body}");
 
                     if is_retryable_status(status) && attempt < max_attempts {
-                        let delay = retry_after
-                            .unwrap_or_else(|| retry_delay(attempt));
+                        let delay = retry_after.unwrap_or_else(|| retry_delay(attempt));
                         tracing::warn!(
                             attempt = attempt,
                             status = %status,
@@ -294,10 +287,8 @@ impl SseParseState {
                                 }
                                 LlmChunk::ToolCallDelta { id, .. } if id.is_empty() => {
                                     // Fill in the ID from the most recent active tool call
-                                    if let Some((_, active_id)) = self
-                                        .active_tool_calls
-                                        .iter()
-                                        .max_by_key(|(idx, _)| *idx)
+                                    if let Some((_, active_id)) =
+                                        self.active_tool_calls.iter().max_by_key(|(idx, _)| *idx)
                                     {
                                         *id = active_id.clone();
                                     }
@@ -323,10 +314,7 @@ impl SseParseState {
 
 /// Returns true if the HTTP status indicates a transient error worth retrying.
 fn is_retryable_status(status: reqwest::StatusCode) -> bool {
-    matches!(
-        status.as_u16(),
-        429 | 500 | 502 | 503 | 529
-    )
+    matches!(status.as_u16(), 429 | 500 | 502 | 503 | 529)
 }
 
 /// Computes exponential backoff delay: 1s * 2^(attempt-1), capped at 8s.
@@ -415,18 +403,14 @@ mod tests {
         );
         let chunks = state.emit_chunks();
         assert_eq!(chunks.len(), 1);
-        assert!(
-            matches!(&chunks[0], Ok(LlmChunk::Text(t)) if t == "Hello")
-        );
+        assert!(matches!(&chunks[0], Ok(LlmChunk::Text(t)) if t == "Hello"));
 
         state.buffer.extend_from_slice(
             b"data: {\"choices\":[{\"delta\":{\"content\":\" world\"},\"finish_reason\":null}]}\n\n",
         );
         let chunks = state.emit_chunks();
         assert_eq!(chunks.len(), 1);
-        assert!(
-            matches!(&chunks[0], Ok(LlmChunk::Text(t)) if t == " world")
-        );
+        assert!(matches!(&chunks[0], Ok(LlmChunk::Text(t)) if t == " world"));
     }
 
     #[test]
@@ -458,9 +442,7 @@ mod tests {
         assert!(chunks.is_empty()); // Not enough data
 
         // Second byte chunk: completes the event
-        state
-            .buffer
-            .extend_from_slice(b"\"Hello\"}}]}\n\n");
+        state.buffer.extend_from_slice(b"\"Hello\"}}]}\n\n");
         let chunks = state.emit_chunks();
         assert_eq!(chunks.len(), 1);
         assert!(matches!(&chunks[0], Ok(LlmChunk::Text(t)) if t == "Hello"));
@@ -527,9 +509,9 @@ mod tests {
         let mut state = SseParseState::new();
 
         // Empty content delta (some providers send these)
-        state.buffer.extend_from_slice(
-            b"data: {\"choices\":[{\"delta\":{\"content\":\"\"}}]}\n\n",
-        );
+        state
+            .buffer
+            .extend_from_slice(b"data: {\"choices\":[{\"delta\":{\"content\":\"\"}}]}\n\n");
         let chunks = state.emit_chunks();
         assert!(chunks.is_empty()); // Skipped by into_chunks()
     }
@@ -538,9 +520,7 @@ mod tests {
     fn test_sse_parse_malformed_json_skipped() {
         let mut state = SseParseState::new();
 
-        state
-            .buffer
-            .extend_from_slice(b"data: {invalid json}\n\n");
+        state.buffer.extend_from_slice(b"data: {invalid json}\n\n");
         let chunks = state.emit_chunks();
         assert!(chunks.is_empty()); // Malformed event skipped
     }
