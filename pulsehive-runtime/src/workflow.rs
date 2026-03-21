@@ -685,4 +685,143 @@ mod tests {
             "Loop should stop on error, got: {outcome:?}"
         );
     }
+
+    // ── Ticket #46: Sequential event ordering ────────────────────────
+
+    #[tokio::test]
+    async fn test_sequential_events_ordered() {
+        let provider = MockLlm::new(vec![
+            MockLlm::text_response("A done"),
+            MockLlm::text_response("B done"),
+        ]);
+        let ctx = test_workflow_ctx(provider).await;
+        let mut rx = ctx.event_emitter.subscribe();
+
+        let agent = AgentDefinition {
+            name: "seq-events".into(),
+            kind: AgentKind::Sequential(vec![
+                llm_agent_def("child-a"),
+                llm_agent_def("child-b"),
+            ]),
+        };
+
+        let _outcome = dispatch_agent(agent, &ctx).await;
+
+        // Collect events
+        let mut events = vec![];
+        while let Ok(event) = rx.try_recv() {
+            events.push(event);
+        }
+
+        // Find AgentStarted events for the LLM children (not the Sequential wrapper)
+        let started_names: Vec<&str> = events
+            .iter()
+            .filter_map(|e| match e {
+                HiveEvent::AgentStarted { name, kind: AgentKindTag::Llm, .. } => Some(name.as_str()),
+                _ => None,
+            })
+            .collect();
+
+        // child-a should start before child-b (sequential ordering)
+        assert_eq!(
+            started_names,
+            vec!["child-a", "child-b"],
+            "Sequential children should start in order"
+        );
+    }
+
+    // ── Ticket #47: Parallel event verification ──────────────────────
+
+    #[tokio::test]
+    async fn test_parallel_events_for_all_children() {
+        let provider = MockLlm::new(vec![
+            MockLlm::text_response("Alpha"),
+            MockLlm::text_response("Beta"),
+        ]);
+        let ctx = test_workflow_ctx(provider).await;
+        let mut rx = ctx.event_emitter.subscribe();
+
+        let agent = AgentDefinition {
+            name: "par-events".into(),
+            kind: AgentKind::Parallel(vec![
+                llm_agent_def("alpha"),
+                llm_agent_def("beta"),
+            ]),
+        };
+
+        let _outcome = dispatch_agent(agent, &ctx).await;
+
+        let mut events = vec![];
+        while let Ok(event) = rx.try_recv() {
+            events.push(event);
+        }
+
+        // Both children should have AgentStarted events
+        let started_names: Vec<&str> = events
+            .iter()
+            .filter_map(|e| match e {
+                HiveEvent::AgentStarted { name, kind: AgentKindTag::Llm, .. } => Some(name.as_str()),
+                _ => None,
+            })
+            .collect();
+
+        assert!(started_names.contains(&"alpha"), "alpha should have AgentStarted");
+        assert!(started_names.contains(&"beta"), "beta should have AgentStarted");
+
+        // Both should have AgentCompleted events
+        let completed_count = events
+            .iter()
+            .filter(|e| matches!(e, HiveEvent::AgentCompleted { outcome: AgentOutcome::Complete { .. }, .. }))
+            .count();
+        assert!(completed_count >= 2, "Both children should complete, got {completed_count}");
+    }
+
+    // ── Ticket #48: Loop additional tests ────────────────────────────
+
+    #[tokio::test]
+    async fn test_loop_single_iteration() {
+        let provider = MockLlm::new(vec![
+            MockLlm::text_response("Only once"),
+        ]);
+        let ctx = test_workflow_ctx(provider).await;
+
+        let agent = AgentDefinition {
+            name: "loop-1".into(),
+            kind: AgentKind::Loop {
+                agent: Box::new(llm_agent_def("worker")),
+                max_iterations: 1,
+            },
+        };
+
+        let outcome = dispatch_agent(agent, &ctx).await;
+        assert!(
+            matches!(&outcome, AgentOutcome::Complete { response } if response == "Only once"),
+            "Loop max=1 should run exactly once, got: {outcome:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_loop_all_iterations_complete_returns_last() {
+        let provider = MockLlm::new(vec![
+            MockLlm::text_response("Iter 1"),
+            MockLlm::text_response("Iter 2"),
+            MockLlm::text_response("Iter 3"),
+        ]);
+        let ctx = test_workflow_ctx(provider).await;
+
+        let agent = AgentDefinition {
+            name: "loop-3".into(),
+            kind: AgentKind::Loop {
+                agent: Box::new(llm_agent_def("worker")),
+                max_iterations: 3,
+            },
+        };
+
+        let outcome = dispatch_agent(agent, &ctx).await;
+        // All 3 completed without [LOOP_DONE], returns last Complete
+        assert!(
+            matches!(&outcome, AgentOutcome::Complete { response } if response == "Iter 3"),
+            "Loop should return last iteration's response, got: {outcome:?}"
+        );
+    }
 }
