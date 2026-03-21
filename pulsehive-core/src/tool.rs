@@ -121,6 +121,7 @@ mod tests {
     fn test_tool_is_object_safe() {
         fn _assert_object_safe(_: &dyn Tool) {}
         fn _assert_boxable(_: Box<dyn Tool>) {}
+        fn _assert_arcable(_: Arc<dyn Tool>) {}
     }
 
     // Mock tool for testing

@@ -3,7 +3,7 @@
 //! Tests the complete flow: HiveMind → deploy() → agentic loop → event stream.
 
 use std::pin::Pin;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -115,7 +115,7 @@ fn build_hive(provider: MockLlm) -> HiveMind {
         .unwrap()
 }
 
-fn llm_agent(name: &str, tools: Vec<Box<dyn Tool>>) -> AgentDefinition {
+fn llm_agent(name: &str, tools: Vec<Arc<dyn Tool>>) -> AgentDefinition {
     AgentDefinition {
         name: name.into(),
         kind: AgentKind::Llm(Box::new(LlmAgentConfig {
@@ -195,7 +195,7 @@ async fn test_deploy_agent_with_tool_call() {
     ]);
     let hive = build_hive(provider);
 
-    let agent = llm_agent("researcher", vec![Box::new(SearchTool)]);
+    let agent = llm_agent("researcher", vec![Arc::new(SearchTool)]);
     let task = Task::new("Research Rust programming");
 
     let stream = hive.deploy(vec![agent], vec![task]).await.unwrap();

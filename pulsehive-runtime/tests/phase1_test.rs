@@ -6,7 +6,7 @@
 //! FR-014 (events).
 
 use std::pin::Pin;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -142,7 +142,7 @@ async fn test_phase1_full_pipeline() {
         name: "code-reviewer".into(),
         kind: AgentKind::Llm(Box::new(LlmAgentConfig {
             system_prompt: "You are a code reviewer.".into(),
-            tools: vec![Box::new(SearchTool)],
+            tools: vec![Arc::new(SearchTool)],
             lens: Lens::new(["rust", "async"]),
             llm_config: LlmConfig::new("test", "test-model"),
             experience_extractor: None,

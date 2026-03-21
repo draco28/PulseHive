@@ -462,7 +462,7 @@ mod tests {
 
     // ── Helper ───────────────────────────────────────────────────────
 
-    fn test_config(tools: Vec<Box<dyn Tool>>) -> LlmAgentConfig {
+    fn test_config(tools: Vec<Arc<dyn Tool>>) -> LlmAgentConfig {
         LlmAgentConfig {
             system_prompt: "You are a test agent.".into(),
             tools,
@@ -528,7 +528,7 @@ mod tests {
             MockLlm::tool_call_response("call_1", "echo", serde_json::json!({"text": "hello"})),
             MockLlm::text_response("Echo said: hello"),
         ]));
-        let config = test_config(vec![Box::new(EchoTool)]);
+        let config = test_config(vec![Arc::new(EchoTool)]);
         let task = test_task();
         let substrate = test_substrate();
         let emitter = EventEmitter::default();
@@ -567,7 +567,7 @@ mod tests {
             .collect();
 
         let provider = Arc::new(MockLlm::new(responses));
-        let config = test_config(vec![Box::new(EchoTool)]);
+        let config = test_config(vec![Arc::new(EchoTool)]);
         let task = test_task();
         let substrate = test_substrate();
         let emitter = EventEmitter::default();
@@ -654,7 +654,7 @@ mod tests {
             MockLlm::tool_call_response("call_1", "echo", serde_json::json!({"text": "test"})),
             MockLlm::text_response("Done"),
         ]));
-        let config = test_config(vec![Box::new(EchoTool)]);
+        let config = test_config(vec![Arc::new(EchoTool)]);
         let task = test_task();
         let substrate = test_substrate();
         let emitter = EventEmitter::default();

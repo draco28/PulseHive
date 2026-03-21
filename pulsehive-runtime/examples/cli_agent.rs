@@ -5,13 +5,15 @@
 //! cargo run -p pulsehive-runtime --example cli_agent
 //! ```
 
+use std::pin::Pin;
+use std::sync::Arc;
+
 use futures::StreamExt;
 use pulsehive_core::agent::{AgentDefinition, AgentKind, LlmAgentConfig};
 use pulsehive_core::lens::Lens;
 use pulsehive_core::llm::*;
 use pulsehive_core::tool::{Tool, ToolContext, ToolResult};
 use pulsehive_runtime::hivemind::{HiveMind, Task};
-use std::pin::Pin;
 
 // A simple tool that returns the current time
 struct GetTime;
@@ -76,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         name: "assistant".into(),
         kind: AgentKind::Llm(Box::new(LlmAgentConfig {
             system_prompt: "You are a helpful assistant.".into(),
-            tools: vec![Box::new(GetTime)],
+            tools: vec![Arc::new(GetTime)],
             lens: Lens::new(["general"]),
             llm_config: LlmConfig::new("mock", "demo"),
             experience_extractor: None,

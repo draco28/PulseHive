@@ -10,13 +10,15 @@
 //!     name: "researcher".into(),
 //!     kind: AgentKind::Llm(LlmAgentConfig {
 //!         system_prompt: "You are a research assistant.".into(),
-//!         tools: vec![Box::new(WebSearch)],
+//!         tools: vec![Arc::new(WebSearch)],
 //!         lens: Lens::new(["research", "papers"]),
 //!         llm_config: LlmConfig::new("openai", "gpt-4"),
 //!         experience_extractor: None,
 //!     }),
 //! };
 //! ```
+
+use std::sync::Arc;
 
 use crate::lens::Lens;
 use crate::llm::LlmConfig;
@@ -25,6 +27,8 @@ use crate::tool::Tool;
 /// Blueprint for creating an agent. Not a running agent — just configuration.
 ///
 /// The framework instantiates and runs agents internally via `HiveMind::deploy()`.
+/// `Clone` is supported: tools and extractors use `Arc` for cheap reference-counted sharing.
+#[derive(Clone)]
 pub struct AgentDefinition {
     /// Human-readable name for this agent.
     pub name: String,
@@ -33,6 +37,7 @@ pub struct AgentDefinition {
 }
 
 /// Determines how an agent executes.
+#[derive(Clone)]
 pub enum AgentKind {
     /// LLM-powered agent with tools and lens-based perception.
     ///
@@ -55,13 +60,15 @@ pub enum AgentKind {
 
 /// Configuration for an LLM-powered agent.
 ///
-/// Cannot derive `Clone` or `Debug` because it contains `Box<dyn Tool>`.
+/// `Clone` is supported: tools and extractors are `Arc`-wrapped for cheap sharing
+/// across workflow iterations (Loop) and concurrent tasks (Parallel).
+#[derive(Clone)]
 pub struct LlmAgentConfig {
     /// System prompt that specializes this agent's behavior.
     pub system_prompt: String,
 
     /// Tools this agent can invoke during the Act phase.
-    pub tools: Vec<Box<dyn Tool>>,
+    pub tools: Vec<Arc<dyn Tool>>,
 
     /// How this agent perceives the substrate.
     pub lens: Lens,
@@ -71,7 +78,7 @@ pub struct LlmAgentConfig {
 
     /// Optional override for experience extraction logic.
     /// `None` uses the framework's default extractor.
-    pub experience_extractor: Option<Box<dyn ExperienceExtractor>>,
+    pub experience_extractor: Option<Arc<dyn ExperienceExtractor>>,
 }
 
 /// Context passed to the experience extractor during the Record phase.
