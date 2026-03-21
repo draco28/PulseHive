@@ -8,6 +8,7 @@
 
 pub mod agent;
 pub mod approval;
+pub mod context;
 pub mod error;
 pub mod event;
 pub mod lens;
@@ -33,6 +34,9 @@ pub mod prelude {
 
     // ── Approval types ───────────────────────────────────────────────
     pub use crate::approval::{ApprovalResult, AutoApprove, PendingAction};
+
+    // ── Context types ────────────────────────────────────────────────
+    pub use crate::context::ContextBudget;
 
     // ── Error types ──────────────────────────────────────────────────
     pub use crate::error::{PulseHiveError, Result};

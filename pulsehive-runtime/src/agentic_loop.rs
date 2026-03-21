@@ -282,7 +282,7 @@ async fn execute_tool_inner(
 
 // ── Perceive Phase ───────────────────────────────────────────────────
 
-/// Query the substrate through the agent's lens and format as intrinsic knowledge.
+/// Query the substrate through the agent's lens and assemble budget-aware context.
 async fn perceive(
     substrate: &dyn SubstrateProvider,
     lens: &Lens,
@@ -291,32 +291,27 @@ async fn perceive(
     agent_id: &str,
 ) -> Vec<Message> {
     use crate::perception;
+    use pulsehive_core::context::ContextBudget;
 
-    let (candidates, activities) = match perception::query_substrate(
-        substrate,
-        lens,
-        task.collective_id,
-    )
-    .await
+    let budget = ContextBudget::from_lens(lens);
+    let messages = match perception::assemble_context(substrate, lens, task.collective_id, &budget)
+        .await
     {
-        Ok(result) => result,
+        Ok(msgs) => msgs,
         Err(e) => {
-            tracing::warn!(agent_id = %agent_id, error = %e, "Perception query failed, continuing without context");
-            (vec![], vec![])
+            tracing::warn!(agent_id = %agent_id, error = %e, "Perception failed, continuing without context");
+            vec![]
         }
     };
 
-    let ranked = perception::rerank(candidates, lens);
-    let experiences: Vec<pulsedb::Experience> =
-        ranked.into_iter().map(|(exp, _score)| exp).collect();
-
+    let experience_count = if messages.is_empty() { 0 } else { 1 }; // At least 1 context message
     event_emitter.emit(HiveEvent::SubstratePerceived {
         agent_id: agent_id.to_string(),
-        experience_count: experiences.len(),
-        insight_count: 0, // Insights added in Phase 2
+        experience_count,
+        insight_count: 0,
     });
 
-    perception::format_as_intrinsic_knowledge(&experiences, &activities)
+    messages
 }
 
 // ── Record Phase ─────────────────────────────────────────────────────

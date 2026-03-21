@@ -177,10 +177,58 @@ pub fn format_as_intrinsic_knowledge(
     vec![Message::system(parts.join("\n"))]
 }
 
+// ── Budget Packing (#32) ─────────────────────────────────────────────
+
+/// Pack ranked experiences within the token budget.
+///
+/// Greedily selects experiences in score order until the token or count
+/// budget is exhausted. Token estimation uses chars/4 + overhead.
+pub fn pack_within_budget(
+    ranked: Vec<(Experience, f32)>,
+    budget: &pulsehive_core::context::ContextBudget,
+) -> Vec<Experience> {
+    use pulsehive_core::context::estimate_tokens;
+
+    let mut packed = Vec::new();
+    let mut tokens_used: u32 = 0;
+
+    for (exp, _score) in ranked {
+        if packed.len() >= budget.max_experiences {
+            break;
+        }
+        let est = estimate_tokens(&exp.content);
+        if tokens_used + est > budget.max_tokens {
+            break;
+        }
+        tokens_used += est;
+        packed.push(exp);
+    }
+
+    packed
+}
+
+// ── Full Assembly (#33) ──────────────────────────────────────────────
+
+/// Assemble budget-aware context from the substrate through the lens.
+///
+/// Complete pipeline: query → re-rank → budget pack → format as intrinsic knowledge.
+pub async fn assemble_context(
+    substrate: &dyn SubstrateProvider,
+    lens: &Lens,
+    collective_id: CollectiveId,
+    budget: &pulsehive_core::context::ContextBudget,
+) -> Result<Vec<Message>> {
+    let (candidates, activities) = query_substrate(substrate, lens, collective_id).await?;
+    let ranked = rerank(candidates, lens);
+    let packed = pack_within_budget(ranked, budget);
+    Ok(format_as_intrinsic_knowledge(&packed, &activities))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use pulsedb::{AgentId, ExperienceId, ExperienceType};
+    use pulsehive_core::context::ContextBudget;
     use pulsehive_core::lens::ExperienceTypeTag;
 
     fn make_experience(
@@ -397,5 +445,73 @@ mod tests {
         assert!(content.contains("You're aware that"));
         assert!(content.contains("researcher"));
         assert!(content.contains("analyzing codebase"));
+    }
+
+    // ── Budget packing tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_pack_within_token_budget() {
+        // Each experience has ~100 chars content → ~25+20=45 tokens estimated
+        let ranked: Vec<(Experience, f32)> = (0..10)
+            .map(|i| {
+                (
+                    make_experience(
+                        &"x".repeat(100),
+                        vec![],
+                        0.5,
+                        ExperienceType::Generic { category: None },
+                        i as f32,
+                    ),
+                    1.0 - (i as f32 * 0.1),
+                )
+            })
+            .collect();
+
+        let budget = ContextBudget {
+            max_tokens: 200, // ~4-5 experiences worth
+            max_experiences: 50,
+            max_insights: 10,
+        };
+
+        let packed = pack_within_budget(ranked, &budget);
+        assert!(
+            packed.len() < 10,
+            "Should have been limited by token budget"
+        );
+        assert!(!packed.is_empty());
+    }
+
+    #[test]
+    fn test_pack_within_experience_budget() {
+        let ranked: Vec<(Experience, f32)> = (0..10)
+            .map(|i| {
+                (
+                    make_experience(
+                        "short",
+                        vec![],
+                        0.5,
+                        ExperienceType::Generic { category: None },
+                        i as f32,
+                    ),
+                    1.0,
+                )
+            })
+            .collect();
+
+        let budget = ContextBudget {
+            max_tokens: 100_000, // Unlimited tokens
+            max_experiences: 3,  // But only 3 experiences
+            max_insights: 10,
+        };
+
+        let packed = pack_within_budget(ranked, &budget);
+        assert_eq!(packed.len(), 3);
+    }
+
+    #[test]
+    fn test_pack_empty_input() {
+        let budget = ContextBudget::default();
+        let packed = pack_within_budget(vec![], &budget);
+        assert!(packed.is_empty());
     }
 }

@@ -19,5 +19,10 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 async-trait = { workspace = true }
+criterion = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
+
+[[bench]]
+name = "substrate_bench"
+harness = false

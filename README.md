@@ -31,36 +31,39 @@ PulseHive eliminates all of this. Agents don't communicate — they **share cons
 
 ```rust
 use pulsehive::prelude::*;
+use pulsehive::{HiveMind, Task};
 
 #[tokio::main]
 async fn main() -> Result<(), PulseHiveError> {
-    // Create a hive mind with PulseDB substrate
+    // Create a hive mind with PulseDB substrate (auto-downloads embedding model)
     let hive = HiveMind::builder()
         .substrate_path("./my_project.db")
-        .llm_provider("openai", OpenAICompatibleProvider::new(config))
+        .llm_provider("openai", my_openai_provider)
         .build()?;
 
-    // Define an agent with a tool
+    // Define an agent with tools and a perception lens
     let agent = AgentDefinition {
         name: "Researcher".into(),
-        kind: AgentKind::Llm(LlmAgentConfig {
+        kind: AgentKind::Llm(Box::new(LlmAgentConfig {
             system_prompt: "You are a research analyst.".into(),
             tools: vec![Box::new(WebSearch)],
-            lens: Lens::new(vec!["research", "analysis"]),
+            lens: Lens::new(["research", "analysis"]),
             llm_config: LlmConfig::new("openai", "gpt-4o"),
-            ..Default::default()
-        }),
+            experience_extractor: None, // Uses default extractor
+        })),
     };
 
-    // Deploy and consume events
-    let mut stream = hive.deploy(vec![agent], vec![task]).await?;
+    // Deploy — agent perceives substrate, thinks, acts, records experiences
+    let mut stream = hive.deploy(vec![agent], vec![Task::new("Analyze the data")]).await?;
     while let Some(event) = stream.next().await {
-        println!("{:?}", event);
+        println!("{event:?}");
     }
 
     Ok(())
 }
 ```
+
+> See [`examples/cli_agent.rs`](pulsehive-runtime/examples/cli_agent.rs) for a complete runnable example.
 
 ## Multi-Agent Example
 
