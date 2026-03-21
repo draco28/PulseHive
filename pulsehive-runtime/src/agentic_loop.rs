@@ -45,7 +45,7 @@ pub async fn run_agentic_loop(config: LlmAgentConfig, ctx: LoopContext<'_>) -> A
         lens,
         llm_config,
         experience_extractor,
-        refresh_every_n_tool_calls: _, // Used in Ticket #52 (mid-task refresh)
+        refresh_every_n_tool_calls,
     } = config;
 
     // Build tool lookup map and definitions for LLM
@@ -75,7 +75,7 @@ pub async fn run_agentic_loop(config: LlmAgentConfig, ctx: LoopContext<'_>) -> A
     messages.extend(context_messages);
     messages.push(Message::user(&ctx.task.description));
 
-    // 3. THINK → ACT loop
+    // 3. THINK → ACT loop (with optional mid-task refresh)
     let outcome = think_act_loop(
         &ctx.agent_id,
         &mut messages,
@@ -83,6 +83,8 @@ pub async fn run_agentic_loop(config: LlmAgentConfig, ctx: LoopContext<'_>) -> A
         &tool_defs,
         &llm_config,
         &ctx,
+        &lens,
+        refresh_every_n_tool_calls,
     )
     .await;
 
@@ -94,6 +96,11 @@ pub async fn run_agentic_loop(config: LlmAgentConfig, ctx: LoopContext<'_>) -> A
 }
 
 /// The core Think→Act loop. Returns when LLM produces a final response or max iterations hit.
+///
+/// When `refresh_every` is `Some(n)`, re-runs the Perceive phase every `n` tool calls,
+/// appending fresh context to the conversation. This enables parallel agents to perceive
+/// each other's experiences mid-task.
+#[allow(clippy::too_many_arguments)]
 async fn think_act_loop(
     agent_id: &str,
     messages: &mut Vec<Message>,
@@ -101,7 +108,11 @@ async fn think_act_loop(
     tool_defs: &[ToolDefinition],
     llm_config: &LlmConfig,
     ctx: &LoopContext<'_>,
+    lens: &Lens,
+    refresh_every: Option<usize>,
 ) -> AgentOutcome {
+    let mut tool_calls_since_refresh: usize = 0;
+
     for iteration in 1..=ctx.max_iterations {
         tracing::info!(agent_id = %agent_id, iteration = iteration, model = %llm_config.model, "Think phase");
 
@@ -167,6 +178,28 @@ async fn think_act_loop(
             .await;
 
             messages.push(Message::tool_result(&tool_call.id, result.to_content()));
+            tool_calls_since_refresh += 1;
+        }
+
+        // ── MID-TASK REFRESH: re-perceive substrate if threshold reached ──
+        if let Some(interval) = refresh_every {
+            if tool_calls_since_refresh >= interval {
+                tracing::info!(
+                    agent_id = %agent_id,
+                    tool_calls = tool_calls_since_refresh,
+                    "Mid-task substrate refresh"
+                );
+                let refreshed = perceive(
+                    ctx.substrate.as_ref(),
+                    lens,
+                    ctx.task,
+                    &ctx.event_emitter,
+                    agent_id,
+                )
+                .await;
+                messages.extend(refreshed);
+                tool_calls_since_refresh = 0;
+            }
         }
     }
 
