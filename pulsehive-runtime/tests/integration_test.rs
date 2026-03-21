@@ -227,6 +227,7 @@ async fn test_deploy_agent_with_tool_call() {
 async fn test_deploy_missing_provider_returns_error() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("test.db");
+    Box::leak(Box::new(dir));
 
     // Build without registering any providers
     let hive = HiveMind::builder().substrate_path(&path).build().unwrap();
@@ -234,12 +235,18 @@ async fn test_deploy_missing_provider_returns_error() {
     let agent = llm_agent("test", vec![]);
     let task = Task::new("Do something");
 
-    let result = hive.deploy(vec![agent], vec![task]).await;
-    assert!(result.is_err());
-    let err = result.err().unwrap();
+    // Deploy succeeds (spawns task), but the agent errors due to missing provider.
+    // The error flows through the event stream as AgentOutcome::Error.
+    let stream = hive.deploy(vec![agent], vec![task]).await.unwrap();
+    let events = collect_events(stream, Duration::from_secs(5)).await;
+
     assert!(
-        err.to_string().contains("not registered"),
-        "Expected 'not registered' error, got: {err}"
+        events.iter().any(|e| matches!(
+            e,
+            HiveEvent::AgentCompleted { outcome: AgentOutcome::Error { error }, .. }
+            if error.contains("not registered")
+        )),
+        "Expected AgentCompleted with 'not registered' error. Events: {events:?}"
     );
 }
 

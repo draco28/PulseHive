@@ -1,6 +1,3 @@
-// Allow dead code until HiveMind is wired to dispatch_agent in Ticket #42.
-#![allow(dead_code)]
-
 //! Workflow execution engine — Sequential, Parallel, Loop agent orchestration.
 //!
 //! This module provides [`dispatch_agent()`], the central routing function that handles

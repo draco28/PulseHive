@@ -26,13 +26,13 @@ use pulsedb::{
 };
 use tokio::sync::broadcast;
 
-use pulsehive_core::agent::{AgentDefinition, AgentKind, AgentKindTag};
+use pulsehive_core::agent::AgentDefinition;
 use pulsehive_core::approval::{ApprovalHandler, AutoApprove};
 use pulsehive_core::error::{PulseHiveError, Result};
 use pulsehive_core::event::{EventBus, HiveEvent};
 use pulsehive_core::llm::LlmProvider;
 
-use crate::agentic_loop::{self, LoopContext, DEFAULT_MAX_ITERATIONS};
+use crate::workflow::{self, WorkflowContext};
 
 /// A task to be executed by deployed agents.
 #[derive(Debug, Clone)]
@@ -96,11 +96,9 @@ impl HiveMind {
 
     /// Deploy agents to execute tasks. Returns a stream of events.
     ///
-    /// Each LLM agent is spawned as a Tokio task running the agentic loop.
-    /// The returned stream receives all events from all agents via broadcast.
-    ///
-    /// Currently only supports `AgentKind::Llm`. Workflow agents
-    /// (Sequential/Parallel/Loop) are supported in Sprint 5.
+    /// Each agent is spawned as a Tokio task and dispatched via
+    /// [`workflow::dispatch_agent()`] which handles all agent kinds
+    /// (LLM, Sequential, Parallel, Loop).
     pub async fn deploy(
         &self,
         agents: Vec<AgentDefinition>,
@@ -124,7 +122,7 @@ impl HiveMind {
         let rx = self.event_bus.subscribe();
 
         for agent in agents {
-            self.spawn_agent(agent, task.clone()).await?;
+            self.spawn_agent(agent, task.clone());
         }
 
         // Convert broadcast::Receiver into a Stream
@@ -149,68 +147,21 @@ impl HiveMind {
     }
 
     /// Spawn a single agent as a Tokio task.
-    async fn spawn_agent(&self, agent: AgentDefinition, task: Task) -> Result<()> {
-        let agent_id = uuid::Uuid::now_v7().to_string();
-        let name = agent.name.clone();
+    ///
+    /// Builds a [`WorkflowContext`] from HiveMind's fields and delegates
+    /// to [`workflow::dispatch_agent()`] which handles all agent kinds.
+    fn spawn_agent(&self, agent: AgentDefinition, task: Task) {
+        let ctx = WorkflowContext {
+            task,
+            llm_providers: self.llm_providers.clone(),
+            substrate: Arc::clone(&self.substrate),
+            approval_handler: Arc::clone(&self.approval_handler),
+            event_emitter: self.event_bus.clone(),
+        };
 
-        match agent.kind {
-            AgentKind::Llm(config) => {
-                // Look up the provider
-                let provider_name = &config.llm_config.provider;
-                let provider = self
-                    .llm_providers
-                    .get(provider_name)
-                    .ok_or_else(|| {
-                        PulseHiveError::config(format!(
-                            "LLM provider '{}' not registered. Available: {:?}",
-                            provider_name,
-                            self.llm_providers.keys().collect::<Vec<_>>()
-                        ))
-                    })?
-                    .clone();
-
-                let substrate = Arc::clone(&self.substrate);
-                let approval = Arc::clone(&self.approval_handler);
-                let emitter = self.event_bus.clone();
-
-                // Emit AgentStarted
-                emitter.emit(HiveEvent::AgentStarted {
-                    agent_id: agent_id.clone(),
-                    name: name.clone(),
-                    kind: AgentKindTag::Llm,
-                });
-
-                // Spawn agent task
-                let agent_id_clone = agent_id.clone();
-                tokio::spawn(async move {
-                    let outcome = agentic_loop::run_agentic_loop(
-                        *config,
-                        LoopContext {
-                            agent_id: agent_id_clone.clone(),
-                            task: &task,
-                            provider,
-                            substrate,
-                            approval_handler: approval.as_ref(),
-                            event_emitter: emitter.clone(),
-                            max_iterations: DEFAULT_MAX_ITERATIONS,
-                        },
-                    )
-                    .await;
-
-                    emitter.emit(HiveEvent::AgentCompleted {
-                        agent_id: agent_id_clone,
-                        outcome,
-                    });
-                });
-
-                Ok(())
-            }
-            AgentKind::Sequential(_) | AgentKind::Parallel(_) | AgentKind::Loop { .. } => {
-                Err(PulseHiveError::config(
-                    "Workflow agents (Sequential/Parallel/Loop) not yet supported. Coming in Sprint 5.",
-                ))
-            }
-        }
+        tokio::spawn(async move {
+            workflow::dispatch_agent(agent, &ctx).await;
+        });
     }
 }
 
