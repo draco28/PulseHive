@@ -46,14 +46,18 @@ pub(crate) struct WorkflowContext {
 ///
 /// This is the central routing function for all agent types:
 /// - `Llm` → agentic loop (Perceive→Think→Act→Record)
-/// - `Sequential` / `Parallel` / `Loop` → workflow executors (not yet implemented)
+/// - `Sequential` / `Parallel` / `Loop` → workflow executors
 ///
 /// Each call emits `AgentStarted` and `AgentCompleted` events, enabling
 /// observability at every nesting level.
-pub(crate) async fn dispatch_agent(
+///
+/// Uses `Box::pin` internally for recursive dispatch (Sequential/Parallel/Loop
+/// call back into `dispatch_agent`, creating recursive futures that need heap allocation).
+pub(crate) fn dispatch_agent(
     agent: AgentDefinition,
     ctx: &WorkflowContext,
-) -> AgentOutcome {
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = AgentOutcome> + Send + '_>> {
+    Box::pin(async move {
     let agent_id = uuid::Uuid::now_v7().to_string();
 
     // Emit lifecycle start event
@@ -65,9 +69,7 @@ pub(crate) async fn dispatch_agent(
 
     let outcome = match agent.kind {
         AgentKind::Llm(config) => run_llm_agent(&agent_id, *config, ctx).await,
-        AgentKind::Sequential(_) => AgentOutcome::Error {
-            error: "Sequential workflow not yet implemented (coming in Ticket #43)".into(),
-        },
+        AgentKind::Sequential(children) => run_sequential(children, ctx).await,
         AgentKind::Parallel(_) => AgentOutcome::Error {
             error: "Parallel workflow not yet implemented (coming in Ticket #44)".into(),
         },
@@ -83,6 +85,43 @@ pub(crate) async fn dispatch_agent(
     });
 
     outcome
+    }) // Box::pin
+}
+
+/// Execute child agents sequentially — each starts after the previous completes.
+///
+/// Children share the substrate and collective, so each child's Perceive phase
+/// naturally finds experiences recorded by all previous children. This is the
+/// "shared consciousness" model — no explicit data passing between agents.
+///
+/// Returns the last child's outcome. Stops early on error or `MaxIterationsReached`.
+/// Empty children list returns `Complete` with empty response.
+async fn run_sequential(
+    children: Vec<AgentDefinition>,
+    ctx: &WorkflowContext,
+) -> AgentOutcome {
+    if children.is_empty() {
+        return AgentOutcome::Complete {
+            response: String::new(),
+        };
+    }
+
+    let mut last_response = String::new();
+    for (i, child) in children.into_iter().enumerate() {
+        tracing::info!(child_index = i, child_name = %child.name, "Sequential: running child");
+        let outcome = dispatch_agent(child, ctx).await;
+        match &outcome {
+            AgentOutcome::Complete { response } => {
+                last_response = response.clone();
+            }
+            AgentOutcome::Error { .. } | AgentOutcome::MaxIterationsReached => {
+                return outcome;
+            }
+        }
+    }
+    AgentOutcome::Complete {
+        response: last_response,
+    }
 }
 
 /// Execute an LLM agent through the agentic loop.
@@ -315,7 +354,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_dispatch_sequential_placeholder() {
+    async fn test_sequential_empty_children() {
         let provider = MockLlm::new(vec![]);
         let ctx = test_workflow_ctx(provider).await;
 
@@ -325,7 +364,55 @@ mod tests {
         };
 
         let outcome = dispatch_agent(agent, &ctx).await;
-        assert!(matches!(&outcome, AgentOutcome::Error { error } if error.contains("Sequential")));
+        assert!(
+            matches!(&outcome, AgentOutcome::Complete { response } if response.is_empty()),
+            "Empty Sequential should return Complete with empty response, got: {outcome:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sequential_two_children_in_order() {
+        let provider = MockLlm::new(vec![
+            MockLlm::text_response("First done"),
+            MockLlm::text_response("Second done"),
+        ]);
+        let ctx = test_workflow_ctx(provider).await;
+
+        let agent = AgentDefinition {
+            name: "pipeline".into(),
+            kind: AgentKind::Sequential(vec![
+                llm_agent_def("step-1"),
+                llm_agent_def("step-2"),
+            ]),
+        };
+
+        let outcome = dispatch_agent(agent, &ctx).await;
+        assert!(
+            matches!(&outcome, AgentOutcome::Complete { response } if response == "Second done"),
+            "Sequential should return last child's response, got: {outcome:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sequential_error_stops_execution() {
+        // Only one response — first child gets it, second would fail if reached
+        let provider = MockLlm::new(vec![]);
+        let ctx = test_workflow_ctx(provider).await;
+
+        let agent = AgentDefinition {
+            name: "failing-seq".into(),
+            kind: AgentKind::Sequential(vec![
+                llm_agent_def("will-error"),
+                llm_agent_def("should-not-run"),
+            ]),
+        };
+
+        let outcome = dispatch_agent(agent, &ctx).await;
+        // First child errors (no LLM responses), second never runs
+        assert!(
+            matches!(&outcome, AgentOutcome::Error { .. }),
+            "Sequential should stop on first error, got: {outcome:?}"
+        );
     }
 
     #[tokio::test]
