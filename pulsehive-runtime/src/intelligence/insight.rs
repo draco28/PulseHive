@@ -206,3 +206,64 @@ impl InsightSynthesizer {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_should_synthesize_below_threshold() {
+        let synth = InsightSynthesizer::with_defaults(); // threshold = 5
+        assert!(!synth.should_synthesize(3));
+        assert!(!synth.should_synthesize(4));
+    }
+
+    #[test]
+    fn test_should_synthesize_at_threshold() {
+        let synth = InsightSynthesizer::with_defaults();
+        assert!(synth.should_synthesize(5));
+        assert!(synth.should_synthesize(10));
+    }
+
+    #[test]
+    fn test_debounce_blocks_immediate_retry() {
+        let synth = InsightSynthesizer::with_defaults(); // debounce = 60s
+        let cid = CollectiveId::new();
+
+        assert!(!synth.is_debounced(cid), "Should not be debounced initially");
+
+        synth.mark_synthesized(cid);
+        assert!(synth.is_debounced(cid), "Should be debounced after marking");
+    }
+
+    #[test]
+    fn test_debounce_allows_different_collective() {
+        let synth = InsightSynthesizer::with_defaults();
+        let cid_a = CollectiveId::new();
+        let cid_b = CollectiveId::new();
+
+        synth.mark_synthesized(cid_a);
+        assert!(synth.is_debounced(cid_a));
+        assert!(!synth.is_debounced(cid_b), "Different collective should not be debounced");
+    }
+
+    #[test]
+    fn test_config_defaults() {
+        let config = InsightSynthesizerConfig::default();
+        assert_eq!(config.relation_density_threshold, 5);
+        assert_eq!(config.debounce_seconds, 60);
+    }
+
+    #[test]
+    fn test_zero_debounce_never_blocks() {
+        let synth = InsightSynthesizer::new(InsightSynthesizerConfig {
+            relation_density_threshold: 5,
+            debounce_seconds: 0,
+        });
+        let cid = CollectiveId::new();
+
+        synth.mark_synthesized(cid);
+        // With 0s debounce, should not be debounced
+        assert!(!synth.is_debounced(cid));
+    }
+}

@@ -135,3 +135,68 @@ fn classify_relation_type(
         _ => RelationType::RelatedTo,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pulsedb::{ExperienceType, RelationType, Severity};
+
+    #[test]
+    fn test_classify_difficulty_solution_supports() {
+        let source = ExperienceType::Difficulty {
+            description: "network timeout".into(),
+            severity: Severity::Medium,
+        };
+        let target = ExperienceType::Solution {
+            problem_ref: None,
+            approach: "add retry".into(),
+            worked: true,
+        };
+        assert_eq!(classify_relation_type(&source, &target), RelationType::Supports);
+        assert_eq!(classify_relation_type(&target, &source), RelationType::Supports);
+    }
+
+    #[test]
+    fn test_classify_error_error_supersedes() {
+        let source = ExperienceType::ErrorPattern {
+            signature: "timeout".into(),
+            fix: "retry".into(),
+            prevention: "set timeout".into(),
+        };
+        let target = ExperienceType::ErrorPattern {
+            signature: "timeout_v2".into(),
+            fix: "circuit breaker".into(),
+            prevention: "backoff".into(),
+        };
+        assert_eq!(classify_relation_type(&source, &target), RelationType::Supersedes);
+    }
+
+    #[test]
+    fn test_classify_decision_insight_implies() {
+        let source = ExperienceType::ArchitecturalDecision {
+            decision: "use circuit breaker".into(),
+            rationale: "resilience".into(),
+        };
+        let target = ExperienceType::TechInsight {
+            technology: "tokio".into(),
+            insight: "spawn_blocking for CPU".into(),
+        };
+        assert_eq!(classify_relation_type(&source, &target), RelationType::Implies);
+        assert_eq!(classify_relation_type(&target, &source), RelationType::Implies);
+    }
+
+    #[test]
+    fn test_classify_default_related_to() {
+        let source = ExperienceType::Generic { category: None };
+        let target = ExperienceType::Generic { category: None };
+        assert_eq!(classify_relation_type(&source, &target), RelationType::RelatedTo);
+    }
+
+    #[test]
+    fn test_config_defaults() {
+        let config = RelationshipDetectorConfig::default();
+        assert!((config.auto_threshold - 0.85).abs() < f32::EPSILON);
+        assert!((config.suggest_threshold - 0.65).abs() < f32::EPSILON);
+        assert!(!config.use_llm_classification);
+    }
+}
