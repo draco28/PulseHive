@@ -32,6 +32,7 @@ use pulsehive_core::error::{PulseHiveError, Result};
 use pulsehive_core::event::{EventBus, HiveEvent};
 use pulsehive_core::llm::LlmProvider;
 
+use crate::intelligence::relationship::RelationshipDetector;
 use crate::workflow::{self, WorkflowContext};
 
 /// A task to be executed by deployed agents.
@@ -70,6 +71,7 @@ pub struct HiveMind {
     pub(crate) llm_providers: HashMap<String, Arc<dyn LlmProvider>>,
     pub(crate) approval_handler: Arc<dyn ApprovalHandler>,
     pub(crate) event_bus: EventBus,
+    pub(crate) relationship_detector: Option<RelationshipDetector>,
 }
 
 impl std::fmt::Debug for HiveMind {
@@ -156,11 +158,10 @@ impl HiveMind {
 
     /// Record an experience in the substrate.
     ///
-    /// Stores the experience via PulseDB and emits an `ExperienceRecorded` event.
-    /// In Builtin embedding mode, the embedding is computed automatically by PulseDB.
-    ///
-    /// This is the programmatic API — products can call it directly, and the
-    /// agentic loop's Record phase uses it internally.
+    /// Stores the experience via PulseDB, emits an `ExperienceRecorded` event,
+    /// and runs the RelationshipDetector to automatically infer relations with
+    /// existing experiences. Each detected relation is stored and emits a
+    /// `RelationshipInferred` event.
     pub async fn record_experience(&self, experience: NewExperience) -> Result<ExperienceId> {
         let agent_id = experience.source_agent.0.clone();
         let id = self.substrate.store_experience(experience).await?;
@@ -168,6 +169,30 @@ impl HiveMind {
             experience_id: id,
             agent_id,
         });
+
+        // Run relationship inference if detector is configured
+        if let Some(detector) = &self.relationship_detector {
+            // Retrieve the stored experience (with computed embedding)
+            if let Ok(Some(stored)) = self.substrate.get_experience(id).await {
+                let relations = detector
+                    .infer_relations(&stored, self.substrate.as_ref())
+                    .await;
+
+                for rel in relations {
+                    match self.substrate.store_relation(rel).await {
+                        Ok(relation_id) => {
+                            self.event_bus.emit(HiveEvent::RelationshipInferred {
+                                relation_id,
+                            });
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "Failed to store inferred relation");
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(id)
     }
 
@@ -231,6 +256,7 @@ pub struct HiveMindBuilder {
     substrate_path: Option<String>,
     llm_providers: HashMap<String, Arc<dyn LlmProvider>>,
     approval_handler: Option<Box<dyn ApprovalHandler>>,
+    relationship_detector: Option<Option<RelationshipDetector>>,
 }
 
 impl HiveMindBuilder {
@@ -240,6 +266,7 @@ impl HiveMindBuilder {
             substrate_path: None,
             llm_providers: HashMap::new(),
             approval_handler: None,
+            relationship_detector: None, // Will default to Some(defaults) in build()
         }
     }
 
@@ -271,6 +298,18 @@ impl HiveMindBuilder {
         self
     }
 
+    /// Set a custom relationship detector. Default: enabled with default thresholds.
+    pub fn relationship_detector(mut self, detector: RelationshipDetector) -> Self {
+        self.relationship_detector = Some(Some(detector));
+        self
+    }
+
+    /// Disable automatic relationship detection.
+    pub fn no_relationship_detector(mut self) -> Self {
+        self.relationship_detector = Some(None);
+        self
+    }
+
     /// Build the HiveMind. Validates that a substrate is configured.
     pub fn build(self) -> Result<HiveMind> {
         let substrate: Arc<dyn SubstrateProvider> = if let Some(s) = self.substrate {
@@ -289,11 +328,18 @@ impl HiveMindBuilder {
             None => Arc::new(AutoApprove),
         };
 
+        // Default: relationship detector enabled with default thresholds
+        let relationship_detector = match self.relationship_detector {
+            Some(explicit) => explicit,
+            None => Some(RelationshipDetector::with_defaults()),
+        };
+
         Ok(HiveMind {
             substrate,
             llm_providers: self.llm_providers,
             approval_handler: approval,
             event_bus: EventBus::default(),
+            relationship_detector,
         })
     }
 }
