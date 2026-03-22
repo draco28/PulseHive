@@ -20,7 +20,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use futures::stream;
-use futures_core::Stream;
+use futures::{Stream, StreamExt};
 use pulsedb::{
     CollectiveId, Config, ExperienceId, NewExperience, PulseDB, PulseDBSubstrate, SubstrateProvider,
 };
@@ -118,6 +118,27 @@ impl HiveMind {
             .get_or_create_collective(&collective_name)
             .await?;
         task.collective_id = collective_id;
+
+        // Subscribe to Watch system for real-time substrate change notifications.
+        // Runs as a background task — failure to subscribe doesn't block deployment.
+        let watch_substrate = Arc::clone(&self.substrate);
+        let watch_emitter = self.event_bus.clone();
+        tokio::spawn(async move {
+            match watch_substrate.watch(collective_id).await {
+                Ok(mut watch_stream) => {
+                    while let Some(event) = watch_stream.next().await {
+                        watch_emitter.emit(HiveEvent::WatchNotification {
+                            experience_id: event.experience_id,
+                            collective_id: event.collective_id,
+                            event_type: format!("{:?}", event.event_type),
+                        });
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to subscribe to Watch system");
+                }
+            }
+        });
 
         let rx = self.event_bus.subscribe();
 
