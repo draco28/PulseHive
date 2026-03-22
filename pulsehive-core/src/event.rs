@@ -87,6 +87,19 @@ pub enum HiveEvent {
         experience_count: usize,
         insight_count: usize,
     },
+
+    // ── Watch system ───────────────────────────────────────────────
+    /// A real-time Watch event from the substrate.
+    ///
+    /// Emitted when experiences are created, updated, archived, or deleted
+    /// by other agents in the same collective. Forwarded from PulseDB's
+    /// Watch system into the HiveEvent stream.
+    WatchNotification {
+        experience_id: ExperienceId,
+        collective_id: pulsedb::CollectiveId,
+        /// The type of change: "Created", "Updated", "Archived", or "Deleted".
+        event_type: String,
+    },
 }
 
 /// Fire-and-forget event broadcaster.
@@ -276,9 +289,14 @@ mod tests {
                 experience_count: 10,
                 insight_count: 2,
             },
+            HiveEvent::WatchNotification {
+                experience_id: ExperienceId::new(),
+                collective_id: pulsedb::CollectiveId::new(),
+                event_type: "Created".into(),
+            },
         ];
         // Clone all — if any variant isn't Clone, this won't compile
         let _cloned: Vec<HiveEvent> = events.to_vec();
-        assert_eq!(events.len(), 12);
+        assert_eq!(events.len(), 13);
     }
 }
