@@ -6,5 +6,6 @@
 pub mod agentic_loop;
 pub mod experience;
 pub mod hivemind;
+pub mod intelligence;
 pub mod perception;
 pub mod workflow;
