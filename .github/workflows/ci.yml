@@ -36,8 +36,10 @@ jobs:
       - name: Build
         run: cargo build --workspace
 
+      # Exclude pulsehive-py from Rust tests (it's a cdylib with Python-dependent doc-tests).
+      # Python bindings are tested separately in the python-tests job.
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --exclude pulsehive-py
 
       - name: Doc
         run: cargo doc --no-deps --workspace
