@@ -43,6 +43,10 @@ pub(crate) struct WorkflowContext {
     pub approval_handler: Arc<dyn ApprovalHandler>,
     /// Event broadcaster for lifecycle and observability events.
     pub event_emitter: EventBus,
+    /// Optional embedding provider for computing embeddings before storage.
+    /// Threaded to LoopContext for experience recording (ticket #125).
+    #[allow(dead_code)]
+    pub embedding_provider: Option<Arc<dyn pulsehive_core::embedding::EmbeddingProvider>>,
 }
 
 /// Dispatch an agent to the appropriate executor based on its kind.
@@ -382,6 +386,7 @@ mod tests {
             substrate,
             approval_handler: Arc::new(pulsehive_core::approval::AutoApprove),
             event_emitter: EventBus::default(),
+            embedding_provider: None,
         }
     }
 
