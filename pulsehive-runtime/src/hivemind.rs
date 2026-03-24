@@ -78,8 +78,6 @@ pub struct HiveMind {
     pub(crate) insight_synthesizer: Option<InsightSynthesizer>,
     /// Optional embedding provider for domain-specific models.
     /// When set, embeddings are computed via this provider before PulseDB storage.
-    /// Used in record_experience() (ticket #125).
-    #[allow(dead_code)]
     pub(crate) embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
     /// Shutdown signal for background tasks (Watch system).
     shutdown: Arc<AtomicBool>,
@@ -182,6 +180,22 @@ impl HiveMind {
     pub async fn record_experience(&self, experience: NewExperience) -> Result<ExperienceId> {
         let agent_id = experience.source_agent.0.clone();
         let collective_id = experience.collective_id;
+
+        // Compute embedding via provider if available and not already set
+        let mut experience = experience;
+        if let Some(provider) = &self.embedding_provider {
+            if experience.embedding.is_none() {
+                match provider.embed(&experience.content).await {
+                    Ok(embedding) => {
+                        experience.embedding = Some(embedding);
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Failed to compute embedding in record_experience, storing without");
+                    }
+                }
+            }
+        }
+
         let id = self.substrate.store_experience(experience).await?;
         self.event_bus.emit(HiveEvent::ExperienceRecorded {
             experience_id: id,

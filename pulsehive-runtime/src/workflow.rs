@@ -44,8 +44,6 @@ pub(crate) struct WorkflowContext {
     /// Event broadcaster for lifecycle and observability events.
     pub event_emitter: EventBus,
     /// Optional embedding provider for computing embeddings before storage.
-    /// Threaded to LoopContext for experience recording (ticket #125).
-    #[allow(dead_code)]
     pub embedding_provider: Option<Arc<dyn pulsehive_core::embedding::EmbeddingProvider>>,
 }
 
@@ -278,6 +276,7 @@ async fn run_llm_agent(
             approval_handler: ctx.approval_handler.as_ref(),
             event_emitter: ctx.event_emitter.clone(),
             max_iterations: DEFAULT_MAX_ITERATIONS,
+            embedding_provider: ctx.embedding_provider.clone(),
         },
     )
     .await
