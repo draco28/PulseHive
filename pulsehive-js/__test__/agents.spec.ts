@@ -1,6 +1,13 @@
-/// Agent type binding tests for AgentKind, AgentDefinition, AgentOutcome.
+/// Agent type binding tests for AgentKind, AgentDefinition.
 
-import { AgentKind, AgentDefinition, LlmConfig, Lens } from "../index";
+import { describe, it, expect } from "vitest";
+
+const {
+  JsAgentKind: AgentKind,
+  JsAgentDefinition: AgentDefinition,
+  JsLlmConfig: LlmConfig,
+  JsLens: Lens,
+} = require("../wrapper.js");
 
 describe("AgentKind", () => {
   it("should create llm kind", () => {

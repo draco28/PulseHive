@@ -5,6 +5,29 @@ All notable changes to PulseHive will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0-alpha.1] - 2026-03-24
+
+### Added — Phase 4: Ecosystem Expansion — TypeScript Bindings (Sprints 13-14)
+
+#### TypeScript/Node.js Bindings (pulsehive-js)
+- napi-rs 3.x-based Node.js bindings with `npm install @pulsehive/sdk` support
+- Core types: `LlmConfig`, `Lens`, `RecencyCurve`, `AgentKind`, `AgentDefinition`, `AgentOutcome`
+- `HiveMind` builder with fluent `.substratePath().llmProvider().build()` chaining
+- `openaiProvider()` and `anthropicProvider()` factory functions
+- Async `deploy()` returning `EventStream` consumable via `for await (const event of stream)`
+- `Symbol.asyncIterator` on EventStream for idiomatic TypeScript iteration
+- All 13 `HiveEvent` variants accessible with `.eventType`, `.data`, `.agentId`
+- `Tool` class with `ThreadsafeFunction` for async Rust-JS tool callback bridging
+- `defineTool()` ergonomic wrapper: typed params + context, no manual JSON serialization
+- `ToolContext` with `agentId` and `collectiveId` accessible from JavaScript
+- `ToolResult.text()`, `.json()`, `.error()` for tool return values
+- Sequential, Parallel, and Loop workflow agents from TypeScript
+- `cfg(feature = "napi")` gating for clean workspace compilation
+- 47 TypeScript tests (unit + integration via vitest)
+- 3 example scripts: getting-started.ts, custom-tools.ts, multi-agent.ts
+- GitHub Actions CI: Node 18/20 matrix for test validation
+- GitHub Actions npm release workflow for cross-platform prebuilds (macOS arm64, Linux x64, Windows x64)
+
 ## [0.3.0-beta] - 2026-03-24
 
 ### Added — Phase 3: Polish + Python Bindings (Sprints 9-12)

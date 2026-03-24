@@ -2,11 +2,11 @@
   "name": "@pulsehive/sdk",
   "version": "0.4.0-alpha.1",
   "description": "TypeScript/Node.js bindings for PulseHive multi-agent SDK",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "wrapper.js",
+  "types": "wrapper.d.ts",
   "scripts": {
-    "build": "napi build --release --features napi",
-    "build:debug": "napi build --features napi",
+    "build": "napi build --platform --release --features napi",
+    "build:debug": "napi build --platform --features napi",
     "test": "vitest run"
   },
   "napi": {
@@ -26,6 +26,8 @@
     "node": ">= 18"
   },
   "files": [
+    "wrapper.js",
+    "wrapper.d.ts",
     "index.js",
     "index.d.ts",
     "*.node"

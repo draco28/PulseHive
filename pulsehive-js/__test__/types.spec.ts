@@ -1,7 +1,8 @@
 /// Type binding tests for LlmConfig, RecencyCurve, Lens.
-/// These tests validate the napi-rs bindings work correctly from TypeScript.
 
-import { LlmConfig, RecencyCurve, Lens } from "../index";
+import { describe, it, expect } from "vitest";
+
+const { JsLlmConfig: LlmConfig, JsRecencyCurve: RecencyCurve, JsLens: Lens } = require("../wrapper.js");
 
 describe("LlmConfig", () => {
   it("should construct with defaults", () => {

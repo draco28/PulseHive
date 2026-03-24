@@ -137,7 +137,7 @@ pub struct JsHiveMind {
 #[napi]
 impl JsHiveMind {
     /// Create a new builder for constructing a HiveMind.
-    #[napi(factory)]
+    #[napi]
     pub fn builder() -> JsHiveMindBuilder {
         JsHiveMindBuilder {
             substrate_path: None,

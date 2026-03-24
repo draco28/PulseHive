@@ -1,11 +1,13 @@
 /// HiveMind binding tests for HiveMind, Task, and provider factories.
 
-import {
+import { describe, it, expect } from "vitest";
+
+const {
   HiveMind,
   Task,
   openaiProvider,
   anthropicProvider,
-} from "../index";
+} = require("../wrapper.js");
 
 describe("Task", () => {
   it("should construct with description", () => {

@@ -1,6 +1,8 @@
-/// Tool bridge tests for Tool, ToolContext, ToolResult.
+/// Tool bridge tests for Tool, ToolResult, defineTool.
 
-import { Tool, ToolResult } from "../index";
+import { describe, it, expect } from "vitest";
+
+const { Tool, ToolResult, defineTool } = require("../wrapper.js");
 
 describe("Tool", () => {
   it("should construct with metadata and callback", () => {
@@ -53,5 +55,40 @@ describe("ToolResult", () => {
     const result = ToolResult.error("something went wrong");
     expect(result.kind).toBe("error");
     expect(result.content).toBe("something went wrong");
+  });
+});
+
+describe("defineTool", () => {
+  it("should create tool with typed execute callback", () => {
+    const tool = defineTool({
+      name: "calculator",
+      description: "Does math",
+      parameters: { type: "object", properties: { a: { type: "number" } } },
+      execute: async (params: any, context: any) => `Result: ${params.a}`,
+    });
+    expect(tool.name).toBe("calculator");
+    expect(tool.description).toBe("Does math");
+    expect(tool.requiresApproval).toBe(false);
+  });
+
+  it("should support requiresApproval flag", () => {
+    const tool = defineTool({
+      name: "danger",
+      description: "Risky",
+      parameters: { type: "object" },
+      execute: async () => "done",
+      requiresApproval: true,
+    });
+    expect(tool.requiresApproval).toBe(true);
+  });
+
+  it("should default requiresApproval to false", () => {
+    const tool = defineTool({
+      name: "safe",
+      description: "Safe",
+      parameters: { type: "object" },
+      execute: async () => "ok",
+    });
+    expect(tool.requiresApproval).toBe(false);
   });
 });
