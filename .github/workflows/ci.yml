@@ -36,10 +36,10 @@ jobs:
       - name: Build
         run: cargo build --workspace
 
-      # Exclude pulsehive-py from Rust tests (it's a cdylib with Python-dependent doc-tests).
-      # Python bindings are tested separately in the python-tests job.
+      # Exclude cdylib crates from Rust tests (they have language-runtime-dependent doc-tests).
+      # Python bindings tested in python-tests job; Node.js bindings tested in node-tests job.
       - name: Test
-        run: cargo test --workspace --exclude pulsehive-py
+        run: cargo test --workspace --exclude pulsehive-py --exclude pulsehive-js
 
       - name: Doc
         run: cargo doc --no-deps --workspace
@@ -73,6 +73,37 @@ jobs:
         run: |
           source .venv/bin/activate
           pytest pulsehive-py/tests/ -v
+
+  node-tests:
+    name: Node.js Tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["18", "20"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install npm deps
+        working-directory: pulsehive-js
+        run: npm install
+
+      - name: Build Node.js bindings
+        working-directory: pulsehive-js
+        run: npm run build
+
+      - name: Run Node.js tests
+        working-directory: pulsehive-js
+        run: npm test
 
   deny:
     name: Cargo Deny

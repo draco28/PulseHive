@@ -1,0 +1,23 @@
+# npm Release Workflow (stub — full implementation in Sprint 14)
+#
+# Will build cross-platform prebuilt binaries and publish to npm:
+# - @pulsehive/sdk (main package with JS loader + .d.ts)
+# - @pulsehive/sdk-darwin-arm64 (macOS ARM64)
+# - @pulsehive/sdk-linux-x64-gnu (Linux x86_64)
+# - @pulsehive/sdk-win32-x64-msvc (Windows x86_64)
+
+name: npm Release
+
+on:
+  workflow_dispatch:
+  # TODO Sprint 14: Enable tag-triggered releases
+  # push:
+  #   tags: ['v*']
+
+jobs:
+  stub:
+    name: Release (not yet configured)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "npm release workflow is a stub — full implementation in Sprint 14"
