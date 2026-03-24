@@ -1,0 +1,32 @@
+[package]
+name = "pulsehive-js"
+version = "0.4.0-alpha.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "TypeScript/Node.js bindings for PulseHive multi-agent SDK"
+
+[lib]
+# cdylib for napi (Node.js addon), rlib for cargo build/test (workspace compat)
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pulsehive-core = { workspace = true }
+pulsehive-runtime = { workspace = true }
+pulsehive-openai = { workspace = true }
+pulsehive-anthropic = { workspace = true }
+napi = { workspace = true }
+napi-derive = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+futures-core = { workspace = true }
+serde_json = { workspace = true }
+
+[build-dependencies]
+napi-build = { workspace = true }
+
+[features]
+# napi feature is non-default to avoid linker errors in workspace builds.
+# @napi-rs/cli activates it when building the Node.js addon.
+napi = ["napi/napi9", "napi/async", "napi/tokio_rt"]

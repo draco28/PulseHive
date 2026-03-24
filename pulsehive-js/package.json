@@ -1,0 +1,39 @@
+{
+  "name": "@pulsehive/sdk",
+  "version": "0.4.0-alpha.1",
+  "description": "TypeScript/Node.js bindings for PulseHive multi-agent SDK",
+  "main": "wrapper.js",
+  "types": "wrapper.d.ts",
+  "scripts": {
+    "build": "napi build --platform --release --features napi",
+    "build:debug": "napi build --platform --features napi",
+    "test": "vitest run"
+  },
+  "napi": {
+    "binaryName": "pulsehive-js",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pulsehive/pulsehive"
+  },
+  "engines": {
+    "node": ">= 18"
+  },
+  "files": [
+    "wrapper.js",
+    "wrapper.d.ts",
+    "index.js",
+    "index.d.ts",
+    "*.node"
+  ],
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0",
+    "vitest": "^3.0.0"
+  }
+}

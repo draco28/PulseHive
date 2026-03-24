@@ -6,6 +6,7 @@ members = [
     "pulsehive-openai",
     "pulsehive-anthropic",
     "pulsehive-py",
+    "pulsehive-js",
 ]
 resolver = "2"
 
@@ -50,6 +51,11 @@ criterion = { version = "0.5", features = ["html_reports"] }
 
 # Python bindings (PyO3)
 pyo3 = { version = "0.28", features = ["macros"] }
+
+# Node.js bindings (napi-rs)
+napi = { version = "3", default-features = false }
+napi-derive = "3"
+napi-build = "1"
 
 # Internal crate references
 pulsehive-core = { path = "pulsehive-core" }

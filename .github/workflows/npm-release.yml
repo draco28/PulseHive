@@ -1,0 +1,94 @@
+name: npm Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-binaries:
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: macOS-arm64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: Linux-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: Windows-x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Install OpenSSL dev headers on Linux (needed by reqwest/native-tls)
+      - name: Install OpenSSL (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Install npm deps
+        working-directory: pulsehive-js
+        run: npm install
+
+      - name: Build native addon
+        working-directory: pulsehive-js
+        run: npx napi build --platform --release --features napi --target ${{ matrix.target }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}
+          path: pulsehive-js/pulsehive-js.*.node
+
+  # TODO: Uncomment when npm account is configured
+  # publish:
+  #   name: Publish to npm
+  #   needs: [build-binaries]
+  #   runs-on: ubuntu-latest
+  #   # Only publish on tag push (not workflow_dispatch)
+  #   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "20"
+  #         registry-url: "https://registry.npmjs.org"
+  #
+  #     - name: Download all binary artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: pulsehive-js
+  #         pattern: binary-*
+  #         merge-multiple: true
+  #
+  #     - name: Install deps and prepare
+  #       working-directory: pulsehive-js
+  #       run: |
+  #         npm install
+  #         npx napi prepublish
+  #
+  #     - name: Publish to npm
+  #       working-directory: pulsehive-js
+  #       run: npm publish --access public
+  #       env:
+  #         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
