@@ -275,7 +275,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else if data.contains("AgentCompleted") {
             println!("  Agent completed");
             if data.contains("Complete") {
-                // Extract the response
                 if let Some(start) = data.find("response: \"") {
                     let rest = &data[start + 11..];
                     if let Some(end) = rest.find('"') {
@@ -283,10 +282,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
+            break;
         }
     }
 
     hive.shutdown();
     println!("\nDone!");
-    Ok(())
+
+    // Force exit: PulseDB's ONNX runtime holds background threads that
+    // prevent clean Tokio runtime shutdown. This is a known PulseDB issue.
+    std::process::exit(0);
 }

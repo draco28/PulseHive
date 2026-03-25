@@ -137,10 +137,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             vec![Task::new("Research PulseHive architecture")],
         )
         .await?;
+    let mut completed = 0usize;
+    let mut started = 0usize;
     while let Some(event) = stream.next().await {
         let data = format!("{event:?}");
-        if data.contains("AgentStarted") || data.contains("AgentCompleted") {
+        if data.contains("AgentStarted") {
+            started += 1;
             println!("  {data}");
+        } else if data.contains("AgentCompleted") {
+            completed += 1;
+            println!("  {data}");
+            if completed >= started {
+                break; // All started agents have completed
+            }
         }
     }
 
@@ -167,10 +176,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stream = hive
         .deploy(vec![team], vec![Task::new("Review the web application")])
         .await?;
+    let mut completed = 0usize;
+    let mut started = 0usize;
     while let Some(event) = stream.next().await {
         let data = format!("{event:?}");
-        if data.contains("AgentStarted") || data.contains("AgentCompleted") {
+        if data.contains("AgentStarted") {
+            started += 1;
             println!("  {data}");
+        } else if data.contains("AgentCompleted") {
+            completed += 1;
+            println!("  {data}");
+            if completed >= started {
+                break; // All started agents have completed
+            }
         }
     }
 
@@ -199,14 +217,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stream = hive
         .deploy(vec![nested], vec![Task::new("Full system review")])
         .await?;
+    let mut completed = 0usize;
+    let mut started = 0usize;
     while let Some(event) = stream.next().await {
         let data = format!("{event:?}");
-        if data.contains("AgentStarted") || data.contains("AgentCompleted") {
+        if data.contains("AgentStarted") {
+            started += 1;
             println!("  {data}");
+        } else if data.contains("AgentCompleted") {
+            completed += 1;
+            println!("  {data}");
+            if completed >= started {
+                break; // All started agents have completed
+            }
         }
     }
 
     hive.shutdown();
     println!("\nDone! All workflows completed.");
-    Ok(())
+
+    // Force exit: PulseDB's ONNX runtime holds background threads that
+    // prevent clean Tokio runtime shutdown. This is a known PulseDB issue.
+    std::process::exit(0);
 }

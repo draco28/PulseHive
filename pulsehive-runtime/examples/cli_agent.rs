@@ -91,6 +91,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     while let Some(event) = stream.next().await {
         println!("{event:?}");
+        if matches!(
+            &event,
+            pulsehive_core::event::HiveEvent::AgentCompleted { .. }
+        ) {
+            break;
+        }
     }
-    Ok(())
+
+    // Force exit: PulseDB's ONNX runtime holds background threads that
+    // prevent clean Tokio runtime shutdown. This is a known PulseDB issue.
+    std::process::exit(0);
 }
