@@ -14,7 +14,7 @@ use crate::stream::PyEventStream;
 
 // ── LLM Provider Proxy ───────────────────────────────────────────────
 
-/// Opaque LLM provider — holds an Arc<dyn LlmProvider> internally.
+/// Opaque LLM provider — holds an `Arc<dyn LlmProvider>` internally.
 ///
 /// Created via factory functions: ``openai_provider()``, ``anthropic_provider()``.
 /// Passed to ``HiveMind.builder().llm_provider(name, provider)``.
@@ -39,7 +39,7 @@ impl PyLlmProviderProxy {
 /// Args:
 ///     api_key: API key for authentication
 ///     model: Default model name (e.g., "gpt-4")
-///     base_url: Override base URL (default: https://api.openai.com/v1)
+///     base_url: Override base URL (default: `https://api.openai.com/v1`)
 #[pyfunction]
 #[pyo3(signature = (api_key, model="gpt-4".to_string(), base_url=None))]
 pub fn openai_provider(
@@ -106,12 +106,14 @@ impl PyTask {
 
 /// The central orchestrator of PulseHive.
 ///
-/// Owns the substrate, LLM providers, and event bus. Create via builder pattern:
+/// Owns the substrate, LLM providers, and event bus. Create via builder pattern.
 ///
-///     hive = HiveMind.builder() \\
-///         .substrate_path("/tmp/my_project.db") \\
-///         .llm_provider("openai", openai_provider("sk-...")) \\
-///         .build()
+/// ```text
+/// hive = HiveMind.builder()
+///     .substrate_path("/tmp/my_project.db")
+///     .llm_provider("openai", openai_provider("sk-..."))
+///     .build()
+/// ```
 #[pyclass(name = "HiveMind")]
 pub struct PyHiveMind {
     // Arc-wrapped so we can clone into async futures (PyO3 requires 'static)
@@ -181,12 +183,14 @@ impl PyHiveMind {
 
 /// Builder for constructing a HiveMind with validated configuration.
 ///
-/// Methods return self for chaining:
+/// Methods return self for chaining.
 ///
-///     hive = HiveMind.builder() \\
-///         .substrate_path("/tmp/test.db") \\
-///         .llm_provider("openai", openai_provider("sk-...")) \\
-///         .build()
+/// ```text
+/// hive = HiveMind.builder()
+///     .substrate_path("/tmp/test.db")
+///     .llm_provider("openai", openai_provider("sk-..."))
+///     .build()
+/// ```
 #[pyclass(name = "HiveMindBuilder")]
 pub struct PyHiveMindBuilder {
     substrate_path: Option<String>,

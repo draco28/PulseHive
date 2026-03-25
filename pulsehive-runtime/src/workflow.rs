@@ -1,15 +1,15 @@
 //! Workflow execution engine — Sequential, Parallel, Loop agent orchestration.
 //!
-//! This module provides [`dispatch_agent()`], the central routing function that handles
-//! all [`AgentKind`] variants. LLM agents are dispatched to the agentic loop; workflow
-//! agents will be dispatched to their respective executors in subsequent tickets.
+//! This module provides `dispatch_agent()`, the central routing function that handles
+//! all `AgentKind` variants. LLM agents are dispatched to the agentic loop; workflow
+//! agents are dispatched to their respective executors.
 //!
 //! ## Architecture
 //!
-//! [`WorkflowContext`] carries all shared resources as owned/Arc types (no lifetimes).
+//! `WorkflowContext` carries all shared resources as owned/Arc types (no lifetimes).
 //! This is critical for the Parallel executor which needs to `tokio::spawn` child tasks
 //! (requiring `'static`). When dispatching to the agentic loop, a temporary
-//! [`LoopContext`] is created with borrows scoped to that call.
+//! `LoopContext` is created with borrows scoped to that call.
 
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -108,7 +108,7 @@ impl HiveMind {
     /// Deploy agents to execute tasks. Returns a stream of events.
     ///
     /// Each agent is spawned as a Tokio task and dispatched via
-    /// [`workflow::dispatch_agent()`] which handles all agent kinds
+    /// the workflow module's `dispatch_agent()` which handles all agent kinds
     /// (LLM, Sequential, Parallel, Loop).
     ///
     /// Automatically subscribes to the PulseDB Watch system for the collective,
@@ -283,7 +283,7 @@ impl HiveMind {
     /// Use this to restart failed agents. Products typically call this when
     /// they observe `AgentCompleted { outcome: Error { .. } }` on the event stream.
     ///
-    /// The collective is created/resolved from the task, same as in [`deploy()`].
+    /// The collective is created/resolved from the task, same as in [`HiveMind::deploy()`].
     pub async fn redeploy(&self, agents: Vec<AgentDefinition>, task: Task) -> Result<()> {
         if agents.is_empty() {
             return Ok(());

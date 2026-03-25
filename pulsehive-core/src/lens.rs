@@ -17,7 +17,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Compact tag for experience types, mirroring PulseDB's 9 [`ExperienceType`] variants.
+/// Compact tag for experience types, mirroring PulseDB's 9 `ExperienceType` variants.
 ///
 /// Used as a key in [`Lens::type_weights`] to control how strongly the agent
 /// attends to each category of experience. Unlike PulseDB's `ExperienceType`,
