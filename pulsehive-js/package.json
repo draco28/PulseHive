@@ -23,7 +23,7 @@
     "url": "https://github.com/pulsehive/pulsehive"
   },
   "engines": {
-    "node": ">= 18"
+    "node": ">= 20"
   },
   "files": [
     "wrapper.js",

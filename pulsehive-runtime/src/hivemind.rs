@@ -581,13 +581,14 @@ mod tests {
         let (hive, cid) = build_hive_with_collective().await;
         let mut rx = hive.event_bus.subscribe();
 
+        let dummy_embedding: Vec<f32> = (0..384).map(|i| (i as f32 * 0.01).sin()).collect();
         let exp = pulsedb::NewExperience {
             collective_id: cid,
             content: "Learned that Rust's ownership model prevents data races.".into(),
             experience_type: pulsedb::ExperienceType::Generic {
                 category: Some("rust".into()),
             },
-            embedding: None, // Builtin embeddings auto-compute
+            embedding: Some(dummy_embedding),
             importance: 0.8,
             confidence: 0.9,
             domain: vec!["rust".into(), "concurrency".into()],
@@ -616,11 +617,14 @@ mod tests {
     async fn test_record_experience_retrievable() {
         let (hive, cid) = build_hive_with_collective().await;
 
+        // Provide a pre-computed embedding to avoid requiring PulseDB's builtin
+        // ONNX model, which may not be cached on CI runners.
+        let dummy_embedding: Vec<f32> = (0..384).map(|i| (i as f32 * 0.01).sin()).collect();
         let exp = pulsedb::NewExperience {
             collective_id: cid,
             content: "Test experience for retrieval.".into(),
             experience_type: pulsedb::ExperienceType::Generic { category: None },
-            embedding: None, // Builtin embeddings auto-compute
+            embedding: Some(dummy_embedding),
             importance: 0.5,
             confidence: 0.5,
             domain: vec![],
