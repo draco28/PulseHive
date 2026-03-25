@@ -188,6 +188,6 @@ describe("Shutdown", () => {
 describe("SDK metadata", () => {
   it("should return version string", () => {
     const v = version();
-    expect(v).toBe("0.4.0-alpha.1");
+    expect(v).toBe("1.0.0");
   });
 });

@@ -46,8 +46,10 @@ describe("HiveMind builder", () => {
 
   it("should build with substrate path", () => {
     const tmpPath = `/tmp/pulsehive-test-${Date.now()}.db`;
+    const provider = openaiProvider("sk-test");
     const hive = HiveMind.builder()
       .substratePath(tmpPath)
+      .llmProvider("openai", provider)
       .build();
     expect(hive.isShutdown).toBe(false);
     hive.shutdown();
