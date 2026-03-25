@@ -81,6 +81,8 @@ pub struct HiveMind {
     pub(crate) embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
     /// Shutdown signal for background tasks (Watch system).
     shutdown: Arc<AtomicBool>,
+    /// Handle to the Watch background task for graceful cancellation.
+    watch_handle: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl std::fmt::Debug for HiveMind {
@@ -140,7 +142,7 @@ impl HiveMind {
         let watch_substrate = Arc::clone(&self.substrate);
         let watch_emitter = self.event_bus.clone();
         let watch_shutdown = Arc::clone(&self.shutdown);
-        tokio::spawn(async move {
+        let watch_handle = tokio::spawn(async move {
             match watch_substrate.watch(collective_id).await {
                 Ok(mut watch_stream) => {
                     while !watch_shutdown.load(Ordering::Relaxed) {
@@ -161,6 +163,7 @@ impl HiveMind {
                 }
             }
         });
+        *self.watch_handle.lock().unwrap() = Some(watch_handle);
 
         let rx = self.event_bus.subscribe();
 
@@ -270,6 +273,11 @@ impl HiveMind {
     /// after processing its current event. This is non-blocking.
     pub fn shutdown(&self) {
         self.shutdown.store(true, Ordering::Relaxed);
+        // Abort the Watch background task so it drops its EventBus sender clone,
+        // allowing the broadcast channel to close and BroadcastStream to terminate.
+        if let Some(handle) = self.watch_handle.lock().unwrap().take() {
+            handle.abort();
+        }
         tracing::info!("HiveMind shutdown signaled");
     }
 
@@ -328,6 +336,9 @@ impl HiveMind {
 impl Drop for HiveMind {
     fn drop(&mut self) {
         self.shutdown.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.watch_handle.get_mut().unwrap().take() {
+            handle.abort();
+        }
     }
 }
 
@@ -498,6 +509,7 @@ impl HiveMindBuilder {
             insight_synthesizer,
             embedding_provider: self.embedding_provider,
             shutdown: Arc::new(AtomicBool::new(false)),
+            watch_handle: std::sync::Mutex::new(None),
         })
     }
 }
