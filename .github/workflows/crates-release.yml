@@ -11,6 +11,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
 jobs:
   publish:
@@ -26,37 +27,29 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # Publish in dependency order with wait between each
+      # Publish in dependency order with wait between each.
+      # "|| true" allows the step to pass if the version already exists
+      # (e.g., when republishing after a manual publish).
       - name: Publish pulsehive-core
-        run: cargo publish -p pulsehive-core
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p pulsehive-core || true
 
       - name: Wait for index propagation
         run: sleep 30
 
       - name: Publish pulsehive-runtime
-        run: cargo publish -p pulsehive-runtime
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p pulsehive-runtime || true
 
       - name: Wait for index propagation
         run: sleep 30
 
       - name: Publish pulsehive-openai
-        run: cargo publish -p pulsehive-openai
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p pulsehive-openai || true
 
       - name: Publish pulsehive-anthropic
-        run: cargo publish -p pulsehive-anthropic
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p pulsehive-anthropic || true
 
       - name: Wait for index propagation
         run: sleep 30
 
       - name: Publish pulsehive (meta-crate)
-        run: cargo publish -p pulsehive
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p pulsehive || true

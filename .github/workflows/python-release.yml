@@ -46,6 +46,8 @@ jobs:
               yum install -y openssl-devel perl-IPC-Cmd
             elif command -v apk &> /dev/null; then
               apk add openssl-dev perl
+            elif command -v apt-get &> /dev/null; then
+              apt-get update && apt-get install -y libssl-dev pkg-config
             fi
 
       - name: Upload wheel
