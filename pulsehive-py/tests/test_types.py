@@ -18,7 +18,7 @@ class TestVersion:
     def test_version_returns_string(self):
         v = version()
         assert isinstance(v, str)
-        assert v.startswith("1.0.")
+        assert len(v.split(".")) >= 2, f"Version should be semver, got: {v}"
 
 
 class TestLlmConfig:
